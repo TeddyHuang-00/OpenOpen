@@ -19,7 +19,7 @@ OpenOpen tries a different answer: **everyone, by vote, automatically.** No main
 Every hour, a GitHub Action:
 
 1. Fetches all open pull requests
-2. Scores each by `(👍 + 1) / (👎 + 1)` — a Bayesian-smoothed approval ratio
+2. Scores each by `(👍 + 1) / (👍 + 👎 + 2)` — Bayesian posterior mean of Beta(1,1) prior
 3. Sorts descending
 4. Attempts to merge the first conflict-free PR
 5. If it merges, the loop stops. Next hour, rinse and repeat.
