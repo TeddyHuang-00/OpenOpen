@@ -52,9 +52,8 @@ jobs:
                 if (r.content === '-1') thumbsDown++;
               }
 
-              // Bayesian prior: Beta(1,1) → mean = (up+1)/(up+down+2)
-              // But user wants (up+1)/(down+1) — a simpler smoothed ratio
-              const score = (thumbsUp + 1) / (thumbsDown + 1);
+              // Bayesian posterior mean: Beta(up+1, down+1) → E[p] = (up+1)/(up+down+2)
+              const score = (thumbsUp + 1) / (thumbsUp + thumbsDown + 2);
 
               console.log(
                 `  PR #${pr.number} "${pr.title}" — 👍${thumbsUp} 👎${thumbsDown} → score=${score.toFixed(3)} [${pr.html_url}]`
