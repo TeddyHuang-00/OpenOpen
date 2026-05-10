@@ -1,0 +1,50 @@
+OpenOpen License
+
+This is free and unencumbered software released into the public domain, to the
+fullest extent permitted by law, with the additional terms below.
+
+1. NO COPYRIGHT
+
+   Any person who contributes to this project, by any means (including but not
+   limited to pull requests, commits, issues, or comments containing code),
+   hereby irrevocably and unconditionally waives all copyright and related or
+   neighboring rights they may have in their contribution, to the fullest
+   extent permitted by law.  All code, documentation, configuration, assets,
+   and any other content in this repository is dedicated to the public domain.
+
+   No contribution to this project may carry any claim of copyright, ever.
+
+2. NO LIABILITY
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NONINFRINGEMENT.  IN NO EVENT
+   SHALL ANY CONTRIBUTOR, PAST OR PRESENT, BE LIABLE FOR ANY CLAIM, DAMAGES,
+   OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE,
+   ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+   OTHER DEALINGS IN THE SOFTWARE — EVEN IF THE LICENSE ITSELF IS LATER
+   REPLACED OR MODIFIED.
+
+3. PERMISSIONS
+
+   Anyone is free to copy, modify, publish, use, compile, sell, or distribute
+   this software, either in source code form or as a compiled binary, for any
+   purpose, commercial or non-commercial, without asking permission, without
+   attribution, and without any restriction whatsoever.
+
+4. LICENSE SELF-MODIFICATION
+
+   This LICENSE file is subject to the same governance as every other file in
+   this repository (see README.md).  It may be replaced or modified at any
+   time by a merged pull request.  However: any replacement or modification
+   applies ONLY to contributions made AFTER the change takes effect.  The
+   waiver in Section 1 is irrevocable for all prior contributions — once code
+   enters this repository, it is forever free.
+
+   In other words: the license may change, but the freedom of what's already
+   here does not.
+
+5. SEVERABILITY
+
+   If any part of this license is found to be unenforceable in a particular
+   jurisdiction, the remainder remains in full force.

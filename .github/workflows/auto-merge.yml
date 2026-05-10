@@ -1,0 +1,105 @@
+name: Auto-Merge by Vote
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Every hour
+  workflow_dispatch:      # Manual trigger for testing
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: read            # Needed to read reactions on PRs
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-merge best PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // 1. Fetch all open PRs
+            const prs = await github.paginate(
+              github.rest.pulls.list,
+              { owner, repo, state: 'open', sort: 'created', direction: 'desc' }
+            );
+
+            if (prs.length === 0) {
+              console.log('No open PRs. Nothing to do.');
+              return;
+            }
+
+            console.log(`Found ${prs.length} open PR(s)`);
+
+            // 2. Score each PR by (👍+1)/(👎+1)
+            const scored = [];
+            for (const pr of prs) {
+              // Fetch reactions on the PR body (issue comment #1 is the PR body)
+              // Reactions are on the issue, not the PR directly
+              const { data: reactions } = await github.rest.reactions.listForIssue({
+                owner,
+                repo,
+                issue_number: pr.number,
+              });
+
+              let thumbsUp = 0;
+              let thumbsDown = 0;
+              for (const r of reactions) {
+                if (r.content === '+1') thumbsUp++;
+                if (r.content === '-1') thumbsDown++;
+              }
+
+              // Bayesian prior: Beta(1,1) → mean = (up+1)/(up+down+2)
+              // But user wants (up+1)/(down+1) — a simpler smoothed ratio
+              const score = (thumbsUp + 1) / (thumbsDown + 1);
+
+              console.log(
+                `  PR #${pr.number} "${pr.title}" — 👍${thumbsUp} 👎${thumbsDown} → score=${score.toFixed(3)} [${pr.html_url}]`
+              );
+
+              scored.push({ pr, thumbsUp, thumbsDown, score });
+            }
+
+            // 3. Sort by score descending
+            scored.sort((a, b) => b.score - a.score);
+
+            // 4. Try to merge from best to worst
+            for (const { pr, score } of scored) {
+              console.log(`\nTrying PR #${pr.number} (score=${score.toFixed(3)})...`);
+
+              // Check mergeability
+              const { data: fresh } = await github.rest.pulls.get({
+                owner, repo, pull_number: pr.number,
+              });
+
+              if (fresh.merged) {
+                console.log(`  Already merged. Skipping.`);
+                continue;
+              }
+
+              if (!fresh.mergeable) {
+                console.log(`  Has conflicts or not mergeable (mergeable=${fresh.mergeable}). Skipping.`);
+                continue;
+              }
+
+              // Merge it!
+              try {
+                await github.rest.pulls.merge({
+                  owner,
+                  repo,
+                  pull_number: pr.number,
+                  merge_method: 'merge',  // or 'squash', 'rebase' — could be PR'd later
+                  commit_title: `Auto-merge: ${pr.title} (👍${pr.thumbsUp}/👎${pr.thumbsDown})`,
+                });
+                console.log(`  ✅ MERGED! PR #${pr.number} — "${pr.title}"`);
+                return;  // One per run — stop after first success
+              } catch (err) {
+                console.log(`  ❌ Merge failed: ${err.message}`);
+                // Continue to next PR
+              }
+            }
+
+            console.log('\nNo PR could be merged this cycle.');
