@@ -48,7 +48,7 @@ We waived liability in Section 2. You tell us.
 ## Getting started
 
 ```bash
-git clone https://github.com/TeddyHuang-00/OpenOpen.git
+git clone https://github.com/selfruled/OpenOpen.git
 # Change anything. Open a PR. Rally the 👍.
 ```
 
