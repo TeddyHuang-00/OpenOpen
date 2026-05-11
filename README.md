@@ -20,9 +20,10 @@ Every hour, a GitHub Action:
 
 1. Fetches all open pull requests
 2. Scores each by `(👍 + 1) / (👍 + 👎 + 2)` — Bayesian posterior mean of Beta(1,1) prior
-3. Sorts descending
-4. Attempts to merge the first conflict-free PR
-5. If it merges, the loop stops. Next hour, rinse and repeat.
+3. Filters out PRs with score < 0.5 (more downvotes than upvotes)
+4. Sorts descending
+5. Attempts to squash-merge the first conflict-free PR, auto-cleaning the branch
+6. If it merges, the loop stops. Next hour, rinse and repeat.
 
 That's the entire governance model. No reviewers. No maintainers. No veto. Just votes and git.
 
