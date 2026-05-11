@@ -65,8 +65,16 @@ jobs:
             // 3. Sort by score descending
             scored.sort((a, b) => b.score - a.score);
 
-            // 4. Try to merge from best to worst
-            for (const { pr, score } of scored) {
+            // 4. Filter out PRs with score < 0.5 (more downvotes than upvotes)
+            const eligible = scored.filter(s => s.score >= 0.5);
+            if (eligible.length === 0) {
+              console.log('No PR meets the 0.5 score threshold. Nothing to merge.');
+              return;
+            }
+            console.log(`${eligible.length} PR(s) above score threshold`);
+
+            // 5. Try to merge from best to worst
+            for (const { pr, score } of eligible) {
               console.log(`\nTrying PR #${pr.number} (score=${score.toFixed(3)})...`);
 
               // Check mergeability
@@ -90,10 +98,25 @@ jobs:
                   owner,
                   repo,
                   pull_number: pr.number,
-                  merge_method: 'merge',  // or 'squash', 'rebase' — could be PR'd later
+                  merge_method: 'squash',
                   commit_title: `Auto-merge: ${pr.title} (👍${pr.thumbsUp}/👎${pr.thumbsDown})`,
                 });
                 console.log(`  ✅ MERGED! PR #${pr.number} — "${pr.title}"`);
+
+                // Clean up branch if it's from the same repository (not a fork)
+                if (fresh.head.repo && fresh.head.repo.full_name === `${owner}/${repo}`) {
+                  try {
+                    await github.rest.git.deleteRef({
+                      owner,
+                      repo,
+                      ref: `heads/${fresh.head.ref}`,
+                    });
+                    console.log(`  🧹 Deleted branch: ${fresh.head.ref}`);
+                  } catch (delErr) {
+                    console.log(`  ⚠️ Could not delete branch ${fresh.head.ref}: ${delErr.message}`);
+                  }
+                }
+
                 return;  // One per run — stop after first success
               } catch (err) {
                 console.log(`  ❌ Merge failed: ${err.message}`);
