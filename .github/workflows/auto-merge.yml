@@ -14,10 +14,17 @@ jobs:
   auto-merge:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
       - name: Auto-merge best PR
         uses: actions/github-script@v7
         with:
           script: |
+            const { execSync } = require('child_process');
+
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
@@ -73,6 +80,23 @@ jobs:
             }
             console.log(`${eligible.length} PR(s) above score threshold`);
 
+            // Helper: git-based squash merge for fork PRs where
+            // GITHUB_TOKEN can't call pulls.merge across fork boundaries.
+            const gitSquashMerge = (prNumber, commitTitle) => {
+              const branch = `pr-${prNumber}`;
+              execSync(`git fetch origin pull/${prNumber}/head:${branch}`, { stdio: 'inherit' });
+              execSync(`git merge --squash ${branch}`, { stdio: 'inherit' });
+              const safeTitle = commitTitle.replace(/"/g, '\\"').replace(/`/g, '\\`');
+              execSync(
+                `git -c user.name="github-actions[bot]" ` +
+                `-c user.email="github-actions[bot]@users.noreply.github.com" ` +
+                `commit -m "${safeTitle}"`,
+                { stdio: 'inherit' }
+              );
+              execSync(`git push origin HEAD:main`, { stdio: 'inherit' });
+              try { execSync(`git branch -D ${branch}`, { stdio: 'ignore' }); } catch {}
+            };
+
             // 5. Try to merge from best to worst
             for (const { pr, score } of eligible) {
               console.log(`\nTrying PR #${pr.number} (score=${score.toFixed(3)})...`);
@@ -92,6 +116,8 @@ jobs:
                 continue;
               }
 
+              const commitTitle = `Auto-merge: ${pr.title} (👍${pr.thumbsUp}/👎${pr.thumbsDown})`;
+
               // Merge it!
               try {
                 await github.rest.pulls.merge({
@@ -99,9 +125,9 @@ jobs:
                   repo,
                   pull_number: pr.number,
                   merge_method: 'squash',
-                  commit_title: `Auto-merge: ${pr.title} (👍${pr.thumbsUp}/👎${pr.thumbsDown})`,
+                  commit_title: commitTitle,
                 });
-                console.log(`  ✅ MERGED! PR #${pr.number} — "${pr.title}"`);
+                console.log(`  ✅ MERGED via API! PR #${pr.number} — "${pr.title}"`);
 
                 // Clean up branch if it's from the same repository (not a fork)
                 if (fresh.head.repo && fresh.head.repo.full_name === `${owner}/${repo}`) {
@@ -119,8 +145,26 @@ jobs:
 
                 return;  // One per run — stop after first success
               } catch (err) {
-                console.log(`  ❌ Merge failed: ${err.message}`);
-                // Continue to next PR
+                // Fork PRs: GITHUB_TOKEN can't call pulls.merge across fork
+                // boundaries (GitHub security restriction). Fall back to
+                // git-based merge, which only needs contents:write.
+                if (err.message.includes('Resource not accessible by integration')) {
+                  console.log(`  API merge blocked (fork PR). Falling back to git merge...`);
+
+                  try {
+                    gitSquashMerge(pr.number, commitTitle);
+                    console.log(`  ✅ MERGED via git! PR #${pr.number} — "${pr.title}"`);
+                    return;  // One per run — stop after first success
+                  } catch (gitErr) {
+                    console.log(`  ❌ Git merge failed: ${gitErr.message}`);
+                    // Clean up git state for the next attempt
+                    try { execSync('git merge --abort', { stdio: 'ignore' }); } catch {}
+                    try { execSync('git reset --hard origin/main', { stdio: 'ignore' }); } catch {}
+                    try { execSync(`git branch -D pr-${pr.number}`, { stdio: 'ignore' }); } catch {}
+                  }
+                } else {
+                  console.log(`  ❌ Merge failed: ${err.message}`);
+                }
               }
             }
 
