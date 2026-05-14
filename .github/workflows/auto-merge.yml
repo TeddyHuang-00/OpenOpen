@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  workflows: write        # Needed to merge PRs that modify workflow files
   issues: read            # Needed to read reactions on PRs
 
 jobs:
