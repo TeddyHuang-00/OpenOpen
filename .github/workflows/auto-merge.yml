@@ -8,7 +8,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  workflows: write        # Needed to merge PRs that modify workflow files
   issues: read            # Needed to read reactions on PRs
 
 jobs:
@@ -19,6 +18,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          token: ${{ secrets.WORKFLOW_TOKEN }}
 
       - name: Auto-merge best PR
         uses: actions/github-script@v7
@@ -147,10 +147,14 @@ jobs:
                 return;  // One per run — stop after first success
               } catch (err) {
                 // Fork PRs: GITHUB_TOKEN can't call pulls.merge across fork
-                // boundaries (GitHub security restriction). Fall back to
-                // git-based merge, which only needs contents:write.
-                if (err.message.includes('Resource not accessible by integration')) {
-                  console.log(`  API merge blocked (fork PR). Falling back to git merge...`);
+                // boundaries (GitHub security restriction).
+                // Workflow PRs: GITHUB_TOKEN lacks workflow scope to modify
+                // .github/workflows/ files via API.
+                // In both cases, fall back to git-based merge using the PAT
+                // from checkout (which has workflow scope).
+                if (err.message.includes('Resource not accessible by integration') ||
+                    err.message.includes('refusing to allow')) {
+                  console.log(`  API merge blocked. Falling back to git merge...`);
 
                   try {
                     gitSquashMerge(pr.number, commitTitle);
