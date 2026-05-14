@@ -112,8 +112,11 @@ jobs:
                 continue;
               }
 
-              if (!fresh.mergeable) {
-                console.log(`  Has conflicts or not mergeable (mergeable=${fresh.mergeable}). Skipping.`);
+              // mergeable can be true, false, or null.
+              // null = not yet computed (common for fork PRs) — treat as try-able.
+              // false = actual merge conflict — skip.
+              if (fresh.mergeable === false) {
+                console.log(`  Has conflicts (mergeable=false). Skipping.`);
                 continue;
               }
 
