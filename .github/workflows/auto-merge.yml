@@ -162,6 +162,17 @@ jobs:
                   try {
                     gitSquashMerge(pr.number, commitTitle);
                     console.log(`  ✅ MERGED via git! PR #${pr.number} — "${pr.title}"`);
+
+                    // Close the PR via API — git-based merge leaves PR open
+                    try {
+                      await github.rest.pulls.update({
+                        owner, repo, pull_number: pr.number, state: 'closed'
+                      });
+                      console.log(`  🧹 Closed PR #${pr.number} via API`);
+                    } catch (closeErr) {
+                      console.log(`  ⚠️ Could not close PR #${pr.number}: ${closeErr.message}`);
+                    }
+
                     return;  // One per run — stop after first success
                   } catch (gitErr) {
                     console.log(`  ❌ Git merge failed: ${gitErr.message}`);
