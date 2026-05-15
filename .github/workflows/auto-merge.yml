@@ -94,15 +94,15 @@ jobs:
               // GITHUB_TOKEN with contents:write + pull-requests:write is sufficient.
               try {
                 await github.graphql(
-                  `mutation($prId: ID!, $method: PullRequestMergeMethod!) {
+                  `mutation($prId: ID!) {
                     enablePullRequestAutoMerge(input: {
                       pullRequestId: $prId,
-                      mergeMethod: $method
+                      mergeMethod: SQUASH
                     }) {
                       clientMutationId
                     }
                   }`,
-                  { prId: fresh.node_id, method: 'SQUASH' }
+                  { prId: fresh.node_id }
                 );
                 console.log(`  ✅ Auto-merge enabled`);
               } catch (err) {
