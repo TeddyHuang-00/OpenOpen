@@ -14,12 +14,19 @@ jobs:
   auto-merge:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.WORKFLOW_TOKEN }}
+
       - name: Auto-merge best PR
         uses: actions/github-script@v7
         with:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const { execSync } = require('child_process');
 
             // 1. Fetch all open PRs
             const prs = await github.paginate(
@@ -71,7 +78,25 @@ jobs:
             }
             console.log(`${eligible.length} PR(s) above score threshold`);
 
-            // 5. Enable auto-merge + approve the best PR
+            // Helper: git-based squash merge.
+            // Only used as fallback for workflow file PRs where GITHUB_TOKEN
+            // lacks workflow scope to enable auto-merge.
+            const gitSquashMerge = (prNumber, commitTitle) => {
+              const branch = `pr-${prNumber}`;
+              execSync(`git fetch origin pull/${prNumber}/head:${branch}`, { stdio: 'inherit' });
+              execSync(`git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" merge --squash ${branch}`, { stdio: 'inherit' });
+              const safeTitle = commitTitle.replace(/\"/g, '\\"').replace(/`/g, '\\`');
+              execSync(
+                `git -c user.name="github-actions[bot]" ` +
+                `-c user.email="github-actions[bot]@users.noreply.github.com" ` +
+                `commit -m "${safeTitle}"`,
+                { stdio: 'inherit' }
+              );
+              execSync(`git push origin HEAD:main`, { stdio: 'inherit' });
+              try { execSync(`git branch -D ${branch}`, { stdio: 'ignore' }); } catch {}
+            };
+
+            // 5. Try auto-merge + approve on the best PR
             for (const { pr, score, thumbsUp, thumbsDown } of eligible) {
               console.log(`\nTrying PR #${pr.number} (score=${score.toFixed(3)})...`);
 
@@ -90,8 +115,9 @@ jobs:
               }
 
               // Enable auto-merge via GraphQL.
-              // Works for fork PRs, workflow file PRs — no PAT needed.
-              // GITHUB_TOKEN with contents:write + pull-requests:write is sufficient.
+              // Works for fork PRs and same-repo PRs.
+              // Does NOT work for PRs that modify .github/workflows/ files
+              // (GITHUB_TOKEN lacks workflow scope) — those fall back to git.
               try {
                 await github.graphql(
                   `mutation($prId: ID!) {
@@ -106,6 +132,36 @@ jobs:
                 );
                 console.log(`  ✅ Auto-merge enabled`);
               } catch (err) {
+                // Workflow file PRs: GITHUB_TOKEN lacks workflow scope
+                // to enable auto-merge. Fall back to git-based merge.
+                if (err.message.includes('without workflows permission') ||
+                    err.message.includes('refusing to allow')) {
+                  console.log(`  Auto-merge blocked (workflow file). Falling back to git merge...`);
+                  const commitTitle = `Auto-merge: ${pr.title} (👍${thumbsUp}/👎${thumbsDown})`;
+                  try {
+                    gitSquashMerge(pr.number, commitTitle);
+                    console.log(`  ✅ MERGED via git! PR #${pr.number}`);
+
+                    // Explain the fallback on the PR
+                    await github.rest.issues.createComment({
+                      owner, repo,
+                      issue_number: pr.number,
+                      body: `Merged via git push because this PR modifies \`.github/workflows/\` files.\n\nGitHub's \`GITHUB_TOKEN\` lacks the \`workflows\` scope, so auto-merge cannot be enabled for workflow file PRs. This is a [known GitHub limitation](https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication#permissions-for-the-github_token).\n\nThe changes have been pushed directly to \`main\` via git using the \`WORKFLOW_TOKEN\` PAT.`
+                    });
+
+                    await github.rest.pulls.update({
+                      owner, repo, pull_number: pr.number, state: 'closed'
+                    });
+                    console.log(`  🧹 Closed PR #${pr.number}`);
+                  } catch (gitErr) {
+                    console.log(`  ❌ Git merge failed: ${gitErr.message}`);
+                    try { execSync('git merge --abort', { stdio: 'ignore' }); } catch {}
+                    try { execSync('git reset --hard origin/main', { stdio: 'ignore' }); } catch {}
+                    try { execSync(`git branch -D pr-${pr.number}`, { stdio: 'ignore' }); } catch {}
+                  }
+                  return;
+                }
+
                 console.log(`  ❌ Could not enable auto-merge: ${err.message}`);
                 continue;
               }
