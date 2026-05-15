@@ -86,7 +86,7 @@ jobs:
             const gitSquashMerge = (prNumber, commitTitle) => {
               const branch = `pr-${prNumber}`;
               execSync(`git fetch origin pull/${prNumber}/head:${branch}`, { stdio: 'inherit' });
-              execSync(`git merge --squash ${branch}`, { stdio: 'inherit' });
+              execSync(`git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" merge --squash ${branch}`, { stdio: 'inherit' });
               const safeTitle = commitTitle.replace(/"/g, '\\"').replace(/`/g, '\\`');
               execSync(
                 `git -c user.name="github-actions[bot]" ` +
