@@ -99,7 +99,7 @@ jobs:
             };
 
             // 5. Try to merge from best to worst
-            for (const { pr, score } of eligible) {
+            for (const { pr, score, thumbsUp, thumbsDown } of eligible) {
               console.log(`\nTrying PR #${pr.number} (score=${score.toFixed(3)})...`);
 
               // Check mergeability
@@ -120,7 +120,7 @@ jobs:
                 continue;
               }
 
-              const commitTitle = `Auto-merge: ${pr.title} (👍${pr.thumbsUp}/👎${pr.thumbsDown})`;
+              const commitTitle = `Auto-merge: ${pr.title} (👍${thumbsUp}/👎${thumbsDown})`;
 
               // Merge it!
               try {
